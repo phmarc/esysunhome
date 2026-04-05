@@ -216,7 +216,7 @@ class DynamicTelemetryParser:
         for segment in segments:
             base_addr = segment.segment_address
             values_bytes = segment.values
-            
+
             # Use segment_type as the function code (3=Holding, 4=Input)
             fc = segment.segment_type
 

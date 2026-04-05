@@ -423,7 +423,7 @@ class ESYSunhomeCoordinator(DataUpdateCoordinator):
         
         # Use Unix timestamp as msg_id (like the app does)
         msg_id = int(time.time())
-        
+
         # Get config_id from protocol if available
         config_id = 0
         if self.protocol:
@@ -442,7 +442,7 @@ class ESYSunhomeCoordinator(DataUpdateCoordinator):
                     MODE_NAMES.get(mode_code, "Unknown"), msg_id)
         
         success = await self.publish_command(command)
-        
+
         return success
     
     async def write_register(self, register_address: int, value: int) -> bool:

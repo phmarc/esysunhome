@@ -316,37 +316,35 @@ class ESYSunhomeAPI:
             mode: The operating mode code to set (1=Regular, 2=Emergency, 3=Sell, 5=BEM)
         """
         await self.ensure_device_id()
-        
+
         url = f"{ESY_API_BASE_URL}{ESY_API_MODE_ENDPOINT}"
-        
-        _LOGGER.info(f"Setting mode to {mode} for device {self.device_id}")
-        
-        # APK uses form data, not JSON body
-        # Parameters: code (mode code), deviceId
-        form_data = {
-            "code": str(mode),
-            "deviceId": self.device_id
+
+        # iOS app sends JSON body with integer code
+        json_data = {
+            "deviceId": self.device_id,
+            "code": mode
         }
-        
-        _LOGGER.debug(f"Mode change request to {url} with data: {form_data}")
-        
-        status, data = await self._make_request_with_auth("POST", url, data=form_data)
-        
-        _LOGGER.debug(f"Mode change response: status={status}, data={data}")
+
+        _LOGGER.info("Setting mode to %s for device %s", mode, self.device_id)
+
+        status, data = await self._make_request_with_auth("POST", url, json=json_data)
+
+        _LOGGER.debug("Mode change response: status=%s, data=%s", status, data)
         
         if status == 200:
-            _LOGGER.info(f"Mode successfully updated to {mode}")
-            
-            # Check if response indicates success
+            # Check if response body indicates success
+            # ESY API returns code=0 for success, anything else is an error
             if isinstance(data, dict):
-                success = data.get("success", True)
                 code = data.get("code", 0)
                 message = data.get("message", "") or data.get("msg", "")
-                
-                # ESY API returns code=0 for success
-                if code != 0 and not success:
-                    _LOGGER.warning(f"API returned error: code={code}, message={message}")
-                    raise Exception(f"Mode change failed: {message}")
+
+                if code != 0:
+                    _LOGGER.error(
+                        "API SET_MODE failed: code=%s, msg='%s'", code, message
+                    )
+                    raise Exception(f"Mode change failed (code={code}): {message}")
+
+            _LOGGER.info(f"Mode successfully updated to {mode}")
         else:
             _LOGGER.error(f"Failed to set mode. Status: {status}, Response: {data}")
             raise Exception(
