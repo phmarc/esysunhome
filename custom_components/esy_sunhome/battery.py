@@ -62,12 +62,16 @@ class BatteryState:
     # Note: code 4 in API = "AI Mode" (not currently on phone app)
     # Note: code 5 in MQTT register 57 = "AC Charging Off Emergency Backup" (not BEM, not sure what that does)
 
+    # BEM (Battery Energy Management) is a server-side scheduling feature,
+    # not an inverter mode. It's controlled separately via a switch entity.
+    BEM_API_CODE = 5
+
     # MQTT systemRunMode (register 5) -> display name (for READING from inverter)
     modes_from_mqtt = {
         1: "Regular Mode",
-        4: "Emergency Mode",         
+        4: "Emergency Mode",
         3: "Electricity Sell Mode",
-        5: "AC Charging Off Emergency",
+        5: "AC Charging Off Emergency Mode",
         0: "Battery Priority Mode",
         2: "Grid Priority Mode",
         6: "PV Mode",
@@ -75,27 +79,32 @@ class BatteryState:
     }
 
     # Display name -> API code (for WRITING via POST /api/lsypattern/switch)
+    # Only base modes — BEM is handled by the BEM switch entity
     modes_to_api = {
         "Regular Mode": 1,
         "Emergency Mode": 2,          # API code for Emergency
         "Electricity Sell Mode": 3,
-        "Battery Energy Management": 5,
     }
 
-    # This maps display name to MQTT value (for WRITING to inverter)
-    # BEM is NOT included — it cannot be set via MQTT
+    # Display name -> MQTT register value (for WRITING to inverter via MQTT)
     modes_to_mqtt = {
         "Regular Mode": 1,
         "Electricity Sell Mode": 3,
-        "Emergency Mode": 4,         
+        "Emergency Mode": 4,
     }
 
-    # For the HA dropdown - simple dict of available modes
+    # MQTT register 5 value -> API code (for reverting from BEM to current base mode)
+    mqtt_to_api = {
+        1: 1,   # Regular
+        3: 3,   # Electricity Sell
+        4: 2,   # Emergency (MQTT 4 → API 2)
+    }
+
+    # For the HA dropdown - base operating modes only
     modes = {
         1: "Regular Mode",
         2: "Emergency Mode",
         3: "Electricity Sell Mode",
-        4: "Battery Energy Management",
     }
 
     def __init__(self, data: dict) -> None:

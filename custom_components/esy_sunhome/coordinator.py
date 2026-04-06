@@ -92,6 +92,12 @@ class ESYSunhomeCoordinator(DataUpdateCoordinator):
         self._last_raw_values: dict = {}  # For diagnostics
         self._last_mqtt_time: Optional[str] = None  # For diagnostics
         self._poll_msg_id: int = 0  # Incrementing message ID for poll requests
+
+        # BEM (Battery Energy Management) state — tracked via API
+        # BEM is a server-side scheduling feature, not visible on MQTT register 5
+        self.bem_active: bool = False
+        self._bem_check_counter: int = 12  # Start at interval to check on first poll
+        self._bem_check_interval: int = 12  # Check every 12th poll (~3min)
         
         # MQTT topics
         self._topic_up = f"/ESY/PVVC/{device_sn}/UP"
@@ -128,6 +134,12 @@ class ESYSunhomeCoordinator(DataUpdateCoordinator):
                 except Exception as e:
                     _LOGGER.warning("Failed to request update from API: %s", e)
         
+        # Periodically check BEM state via API
+        self._bem_check_counter += 1
+        if self._bem_check_counter >= self._bem_check_interval:
+            self._bem_check_counter = 0
+            await self._check_bem_state()
+
         # Return cached data
         return TelemetryData(self._last_data)
     
@@ -157,6 +169,26 @@ class ESYSunhomeCoordinator(DataUpdateCoordinator):
         except Exception as e:
             _LOGGER.error("Failed to send poll request: %s", e)
             return False
+
+    async def _check_bem_state(self) -> None:
+        """Check if BEM is active by querying the API device info.
+
+        The API 'code' field is the only reliable source for BEM state.
+        MQTT register 5 reports the base mode even when BEM is active.
+        """
+        try:
+            device_info = await self.api.get_device_info()
+            api_code = device_info.get("code")
+            if api_code is not None:
+                was_active = self.bem_active
+                self.bem_active = int(api_code) == 5
+                if was_active != self.bem_active:
+                    _LOGGER.info(
+                        "BEM state changed: %s",
+                        "active" if self.bem_active else "inactive",
+                    )
+        except Exception as e:
+            _LOGGER.debug("Failed to check BEM state: %s", e)
 
     async def async_config_entry_first_refresh(self) -> None:
         """Perform first refresh and start MQTT."""
@@ -395,7 +427,6 @@ class ESYSunhomeCoordinator(DataUpdateCoordinator):
         - Regular Mode -> write 1
         - Emergency Mode -> write 4
         - Electricity Sell Mode -> write 3
-        - Battery Energy Management -> write 5
         
         Args:
             mode_code: MQTT register value to write
@@ -414,7 +445,7 @@ class ESYSunhomeCoordinator(DataUpdateCoordinator):
             1: "Regular",
             4: "Emergency", 
             3: "Sell",
-            5: "BEM",
+            5: "AC Charging Off EB",
             0: "Battery Priority",
             2: "Grid Priority",
             6: "PV",

@@ -170,6 +170,9 @@
             "ratedPower": {
                 "name": "Rated Power"
             },
+            "baseOperatingMode": {
+                "name": "Base Operating Mode"
+            },
             "systemRunMode": {
                 "name": "System Mode"
             },
@@ -194,21 +197,12 @@
                 "name": "Alarm Active"
             }
         },
-        "select": {
-            "code": {
-                "name": "Operating Mode",
-                "state": {
-                    "1": "Regular",
-                    "2": "Emergency",
-                    "3": "Sell First",
-                    "4": "Reserved",
-                    "5": "Battery Management"
-                }
-            }
-        },
         "switch": {
             "heatingState": {
                 "name": "Battery Heating"
+            },
+            "bem": {
+                "name": "Battery Energy Management"
             }
         }
     }

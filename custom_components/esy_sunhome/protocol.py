@@ -505,7 +505,7 @@ class DynamicTelemetryParser:
             1: "Regular Mode",
             4: "Emergency Mode",
             3: "Electricity Sell Mode",
-            5: "Battery Energy Management",  # Simplified - APK maps to AC Charging Off
+            5: "AC Charging Off Emergency Mode",  # MQTT register 5 value 5 is NOT BEM
             0: "Battery Priority Mode",
             2: "Grid Priority Mode",
             6: "PV Mode",
