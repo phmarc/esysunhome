@@ -98,6 +98,9 @@ class ESYSunhomeCoordinator(DataUpdateCoordinator):
         self.bem_active: bool = False
         self._bem_check_counter: int = 12  # Start at interval to check on first poll
         self._bem_check_interval: int = 12  # Check every 12th poll (~3min)
+
+        # Schedule/SOC data — fetched from API alongside BEM checks
+        self.schedule_data: Optional[dict] = None
         
         # MQTT topics
         self._topic_up = f"/ESY/PVVC/{device_sn}/UP"
@@ -171,7 +174,7 @@ class ESYSunhomeCoordinator(DataUpdateCoordinator):
             return False
 
     async def _check_bem_state(self) -> None:
-        """Check if BEM is active by querying the API device info.
+        """Check if BEM is active and fetch schedule/SOC data.
 
         The API 'code' field is the only reliable source for BEM state.
         MQTT register 5 reports the base mode even when BEM is active.
@@ -189,6 +192,12 @@ class ESYSunhomeCoordinator(DataUpdateCoordinator):
                     )
         except Exception as e:
             _LOGGER.debug("Failed to check BEM state: %s", e)
+
+        # Fetch schedule data (SOC cutoffs)
+        try:
+            self.schedule_data = await self.api.get_schedule()
+        except Exception as e:
+            _LOGGER.debug("Failed to fetch schedule data: %s", e)
 
     async def async_config_entry_first_refresh(self) -> None:
         """Perform first refresh and start MQTT."""

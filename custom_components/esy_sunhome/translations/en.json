@@ -197,6 +197,17 @@
                 "name": "Alarm Active"
             }
         },
+        "number": {
+            "soc_purchase_cutoff": {
+                "name": "SOC Purchase Cutoff"
+            },
+            "soc_sale_cutoff": {
+                "name": "SOC Sale Cutoff"
+            },
+            "soc_use_cutoff": {
+                "name": "SOC Use Cutoff"
+            }
+        },
         "switch": {
             "heatingState": {
                 "name": "Battery Heating"

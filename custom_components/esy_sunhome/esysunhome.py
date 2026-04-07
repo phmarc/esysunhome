@@ -13,7 +13,8 @@ from .const import (
     ESY_API_DEVICE_ENDPOINT,
     ESY_API_OBTAIN_ENDPOINT,
     ESY_API_MODE_ENDPOINT,
-    ESY_SCHEDULES_ENDPOINT,
+    ESY_API_SOCSCHEDULES_QUERY_ENDPOINT,
+    ESY_API_SOCSCHEDULES_SAVE_ENDPOINT,
     ESY_API_DEVICE_INFO,
     ESY_API_CERT_ENDPOINT,
     ATTR_SCHEDULE_MODE
@@ -351,24 +352,64 @@ class ESYSunhomeAPI:
                 f"Failed to set mode. Status code: {status}"
             )
 
-    async def update_schedule(self, mode: int):
-        """Call the schedule endpoint to fetch the current schedule, not yet implemented."""
+    @retry_with_backoff(max_retries=2, initial_delay=1.0)
+    async def get_schedule(self) -> Dict[str, Any]:
+        """Fetch the current BEM schedule including SOC cutoff values.
+
+        Returns:
+            Schedule data dict with chargeCutOff, dischargeCutOff, releaseCutOff,
+            time quantums, switches, etc.
+        """
         await self.ensure_device_id()
-        
-        url = f"{ESY_API_BASE_URL}{ESY_SCHEDULES_ENDPOINT}{self.device_id}"
-        
-        try:
-            status, data = await self._make_request_with_auth("GET", url)
-            
-            _LOGGER.debug(f"Schedule fetch status: {status}")
-            
-            if status == 200:
-                _LOGGER.debug(f"Current schedule: {data}")
-            else:
-                _LOGGER.warning(f"Failed to fetch schedule: {status} - {data}")
-        except Exception as e:
-            _LOGGER.error(f"Error fetching schedule: {e}")
-            # Don't raise - this is not critical functionality
+
+        url = f"{ESY_API_BASE_URL}{ESY_API_SOCSCHEDULES_QUERY_ENDPOINT}{self.device_id}"
+
+        status, data = await self._make_request_with_auth("GET", url)
+
+        if status == 200 and isinstance(data, dict) and data.get("code") == 0:
+            schedule = data.get("data", {})
+            _LOGGER.debug("Retrieved schedule: %s", schedule)
+            return schedule
+        else:
+            raise Exception(f"Failed to fetch schedule. Status: {status}, Response: {data}")
+
+    @retry_with_backoff(max_retries=2, initial_delay=1.0)
+    async def save_schedule(self, schedule: Dict[str, Any]) -> None:
+        """Save the BEM schedule (including SOC cutoff values).
+
+        The API expects the full schedule payload. Callers should first
+        call get_schedule(), modify the desired fields, then pass the
+        updated dict here.
+
+        Args:
+            schedule: Full schedule dict to save.
+        """
+        await self.ensure_device_id()
+
+        url = f"{ESY_API_BASE_URL}{ESY_API_SOCSCHEDULES_SAVE_ENDPOINT}"
+
+        # Ensure deviceId is set
+        payload = dict(schedule)
+        payload["deviceId"] = self.device_id
+        # Remove server-only fields that shouldn't be sent back
+        payload.pop("id", None)
+        payload.pop("createTime", None)
+        payload.pop("updateTime", None)
+
+        _LOGGER.info("Saving schedule with SOC values: charge=%s, discharge=%s, release=%s",
+                     payload.get("chargeCutOff"), payload.get("dischargeCutOff"),
+                     payload.get("releaseCutOff"))
+
+        status, data = await self._make_request_with_auth("POST", url, json=payload)
+
+        if status == 200 and isinstance(data, dict):
+            code = data.get("code", 0)
+            if code != 0:
+                msg = data.get("msg", "") or data.get("message", "")
+                raise Exception(f"Schedule save failed (code={code}): {msg}")
+            _LOGGER.info("Schedule saved successfully")
+        else:
+            raise Exception(f"Failed to save schedule. Status: {status}, Response: {data}")
 
     @retry_with_backoff(max_retries=2, initial_delay=1.0)
     async def get_device_info(self) -> Dict[str, Any]:
